@@ -5,33 +5,25 @@ import (
 	"fmt"
 )
 
+type LabelOffset struct {
+	Label       string
+	Offset      uint16
+	InsnOffsets []int
+}
+
 func Compile(unit *Unit) ([]uint8, error) {
 	if _, found := unit.Sections["main"]; !found {
 		return nil, errors.New("label 'main' is not defined")
 	}
 
-	labelAddrs := map[string]uint16{
-		"rst_00":     0x0000,
-		"rst_08":     0x0008,
-		"rst_10":     0x0010,
-		"rst_18":     0x0018,
-		"rst_20":     0x0020,
-		"rst_28":     0x0028,
-		"rst_30":     0x0030,
-		"rst_38":     0x0038,
-		"int_vblank": 0x0040,
-		"int_lcdc":   0x0048,
-		"int_timer":  0x0050,
-		"int_serial": 0x0058,
-		"int_keys":   0x0060,
-		"main":       0x0150,
-	}
+	// for resolving labels
+	labelOffsets := map[string]LabelOffset{}
 
 	// enough space for all header stuff
-	output := make([]uint8, 0x0100)
+	output := make([]uint8, 0x0150)
 
 	// compile special sections
-	for _, label := range []string{
+	for idx, label := range []string{
 		"rst_00",
 		"rst_08",
 		"rst_10",
@@ -46,38 +38,84 @@ func Compile(unit *Unit) ([]uint8, error) {
 		"int_serial",
 		"int_keys",
 	} {
-		bytes, err := compileSpecial(unit, label)
+		bytes, insnOffsets, err := compileSpecial(unit, label)
 		if err != nil {
 			return nil, err
 		}
+
+		labelOffset := idx * 0x08
 		for i := 0; i < len(bytes); i++ {
-			output[int(labelAddrs[label])+i] = bytes[i]
+			output[labelOffset+i] = bytes[i]
+		}
+
+		labelOffsets[label] = LabelOffset{
+			label,
+			uint16(labelOffset),
+			insnOffsets,
 		}
 	}
 
 	// copy header
 	header := generateHeader()
-	output = append(output, header[:]...)
+	for i := 0; i < len(header); i++ {
+		output[0x0100+i] = header[i]
+	}
 
 	// generate main
-	bytes, err := compileSection(unit, "main")
+	bytes, insnOffsets, err := compileSection(unit, "main")
 	if err != nil {
 		return nil, err
+	}
+	labelOffsets["main"] = LabelOffset{
+		"main",
+		0x0150,
+		insnOffsets,
 	}
 	output = append(output, bytes...)
 
 	// generate everything else
 	for _, label := range unit.Labels {
 		// skip already compiled sections
-		if _, found := labelAddrs[label]; found {
+		if _, found := labelOffsets[label]; found {
 			continue
 		}
 
-		bytes, err := compileSection(unit, label)
+		bytes, insnOffsets, err := compileSection(unit, label)
 		if err != nil {
 			return nil, err
 		}
+		labelOffsets[label] = LabelOffset{
+			label,
+			uint16(len(output)),
+			insnOffsets,
+		}
 		output = append(output, bytes...)
+	}
+
+	// resolve labels
+	for targetLabel, labelUsage := range unit.LabelUsages {
+		targetAddr := uint16(labelOffsets[targetLabel].Offset)
+
+		usage := labelOffsets[labelUsage.Section]
+		usageOffset := usage.Offset + uint16(usage.InsnOffsets[labelUsage.InsnIndex])
+
+		insn := unit.Sections[labelUsage.Section].Insns[labelUsage.InsnIndex]
+		if insn.Name == "jr" {
+			// calculate relative
+			startAddr := usageOffset + 2
+			delta := int(targetAddr) - int(startAddr)
+
+			if delta > 127 || delta < -128 { // int8 range
+				insn.Err = errors.New(fmt.Sprintf("target label '%s' is out of range (%d)", targetLabel, delta))
+				return nil, &insn
+			}
+
+			output[usageOffset+1] = uint8(int8(delta))
+		} else {
+			// inject absolute
+			output[usageOffset+1] = uint8(targetAddr & 0xff)
+			output[usageOffset+2] = uint8(targetAddr >> 8)
+		}
 	}
 
 	// calculate checksum
@@ -85,28 +123,29 @@ func Compile(unit *Unit) ([]uint8, error) {
 	for _, b := range output {
 		checksum += uint(b)
 	}
-	output[0x014e] = uint8((checksum >> 8) & 0xff)
+	output[0x014e] = uint8(checksum >> 8)
 	output[0x014f] = uint8(checksum & 0xff)
 
 	return output, nil
 }
 
-func compileSection(unit *Unit, label string) ([]uint8, error) {
+func compileSection(unit *Unit, label string) ([]uint8, []int, error) {
 	if section, found := unit.Sections[label]; found {
-		bytes, err := Assemble(section.Insns)
-		return bytes, err
+		return Assemble(section.Insns)
 	} else {
-		return nil, errors.New(fmt.Sprintf("unknown label '%s'", label))
+		return nil, nil, errors.New(fmt.Sprintf("unknown label '%s'", label))
 	}
 }
 
-func compileSpecial(unit *Unit, label string) ([8]uint8, error) {
+func compileSpecial(unit *Unit, label string) ([8]uint8, []int, error) {
 	output := [8]uint8{}
+	var offsets []int = nil
 
 	if section, found := unit.Sections[label]; found {
-		bytes, err := Assemble(section.Insns)
+		bytes, _offsets, err := Assemble(section.Insns)
+		offsets = _offsets
 		if err != nil {
-			return output, err
+			return output, nil, err
 		}
 
 		for i := 0; i < 8 && i < len(bytes); i++ {
@@ -114,7 +153,7 @@ func compileSpecial(unit *Unit, label string) ([8]uint8, error) {
 		}
 	}
 
-	return output, nil
+	return output, offsets, nil
 }
 
 func generateHeader() [0x50]uint8 {

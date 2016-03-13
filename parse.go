@@ -24,7 +24,6 @@ type Insn struct {
 type LabelLocation struct {
 	Section   string
 	InsnIndex int
-	ArgIndex  int
 }
 
 type Unit struct {
@@ -74,7 +73,6 @@ func Parse(lines []string) (*Unit, error) {
 					labelUsages[label] = &LabelLocation{
 						currentSection.Label,
 						len(currentSection.Insns),
-						argIndex,
 					}
 
 					// replace with appropriate placeholder

@@ -7,18 +7,20 @@ import (
 	"strconv"
 )
 
-func Assemble(insns []Insn) ([]uint8, error) {
+func Assemble(insns []Insn) ([]uint8, []int, error) {
 	out := make([]uint8, 0, len(insns))
+	offsets := make([]int, len(insns))
 
-	for _, insn := range insns {
+	for i, insn := range insns {
 		asm, err := assembleInsn(&insn)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		offsets[i] = len(out)
 		out = append(out, asm...)
 	}
 
-	return out, nil
+	return out, offsets[:], nil
 }
 
 func assembleInsn(insn *Insn) ([]uint8, error) {
