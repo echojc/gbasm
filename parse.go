@@ -41,8 +41,13 @@ func Parse(lines []string) (*Unit, error) {
 
 	for i, text := range lines {
 		lineNumber := uint(i + 1)
-		text = strings.TrimSpace(strings.ToLower(text))
 
+		// drop comments
+		if i := strings.Index(text, ";"); i >= 0 {
+			text = text[0:i]
+		}
+
+		text = strings.TrimSpace(strings.ToLower(text))
 		if text == "" {
 			continue
 		}
