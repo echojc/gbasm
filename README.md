@@ -1,6 +1,6 @@
 # gbasm
 
-A compiler to go with [echojc/goboy](https://github.com/echojc/goboy).
+An assembler to go with [echojc/goboy](https://github.com/echojc/goboy).
 
 ## Compiling
 
