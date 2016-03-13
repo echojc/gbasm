@@ -120,23 +120,31 @@ func assembleInsn(insn *Insn) ([]uint8, error) {
 		}
 	case "inc":
 		if len(insn.Args) == 1 {
-			reg, err := asmReg8Hi(insn.Args[0])
-			if err != nil {
-				insn.Err = err
-				return nil, insn
+			reg8, err1 := asmReg8Hi(insn.Args[0])
+			if err1 != nil {
+				reg16, err2 := asmReg16(insn.Args[0])
+				if err2 != nil {
+					insn.Err = errors.New(fmt.Sprintf("%s or %s", err1.Error(), err2.Error()))
+					return nil, insn
+				}
+				return []uint8{0x03 | reg16}, nil
 			}
-			return []uint8{0x04 | reg}, nil
+			return []uint8{0x04 | reg8}, nil
 		} else {
 			return nil, insn.expectedNumberArgs(1)
 		}
 	case "dec":
 		if len(insn.Args) == 1 {
-			reg, err := asmReg8Hi(insn.Args[0])
-			if err != nil {
-				insn.Err = err
-				return nil, insn
+			reg8, err1 := asmReg8Hi(insn.Args[0])
+			if err1 != nil {
+				reg16, err2 := asmReg16(insn.Args[0])
+				if err2 != nil {
+					insn.Err = errors.New(fmt.Sprintf("%s or %s", err1.Error(), err2.Error()))
+					return nil, insn
+				}
+				return []uint8{0x0b | reg16}, nil
 			}
-			return []uint8{0x05 | reg}, nil
+			return []uint8{0x05 | reg8}, nil
 		} else {
 			return nil, insn.expectedNumberArgs(1)
 		}
