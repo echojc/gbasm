@@ -1,18 +1,19 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 func main() {
 
 	//if len(os.Args) < 2 {
-	//	log.Printf("Usage: %s <file>\n", os.Args[0])
-	//	os.Exit(2)
+	//	log.Fatalf("Usage: %s <file>\n", os.Args[0])
 	//}
 
 	//file, err := os.Open(os.Args[1])
 	//if err != nil {
-	//	log.Printf("Could not open file '%s'\n", os.Args[1])
-	//	os.Exit(1)
+	//	log.Fatalf("Could not open file '%s'\n", os.Args[1])
 	//}
 	//defer file.Close()
 
@@ -22,11 +23,13 @@ func main() {
 	//	lines = append(lines, scanner.Text())
 	//}
 	//if err := scanner.Err(); err != nil {
-	//	log.Printf("Error reading file: %v\n", err)
-	//	os.Exit(3)
+	//	log.Fatalf("Error reading file: %v\n", err)
 	//}
 
 	lines := []string{
+		":rst_00",
+		"jp main",
+		":main",
 		"ld a, $03",
 		"di",
 		"ldh ($ff), a",
@@ -34,19 +37,28 @@ func main() {
 		"ldh ($41), a",
 		"xor a",
 		"ldh ($40), a",
+		":loop",
 		"ldh a, ($44)",
 		"cp $94",
-		"jr nz, $-06",
+		"jr nz, loop",
 		"halt",
 	}
 
-	bytes, err := Assemble(lines)
+	unit, err := Parse(lines)
 	if err != nil {
-		fmt.Println(err)
-	} else {
-		for _, b := range bytes {
-			fmt.Printf("%02x ", b)
-		}
-		fmt.Println()
+		log.Fatalln(err)
 	}
+
+	bytes, err := Compile(unit)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	for i, b := range bytes {
+		fmt.Printf("%02x ", b)
+		if (i+1)%0x10 == 0 {
+			fmt.Println()
+		}
+	}
+	fmt.Println()
 }

@@ -5,49 +5,16 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
-	"unicode"
 )
 
-type Insn struct {
-	Name       string
-	Args       []string
-	LineNumber uint
-	Err        error
-}
+func Assemble(insns []Insn) ([]uint8, error) {
+	out := make([]uint8, 0, len(insns))
 
-func ParseInsn(line string, num uint) Insn {
-	spaceOrComma := func(c rune) bool { return unicode.IsSpace(c) || c == ',' }
-	parts := strings.FieldsFunc(line, spaceOrComma)
-
-	insn := Insn{}
-	insn.Name = parts[0]
-	insn.Args = parts[1:]
-	insn.LineNumber = num
-	return insn
-}
-
-func (i *Insn) Error() string {
-	return fmt.Sprintf("%d: %s", i.LineNumber, i.Err.Error())
-}
-
-func (i *Insn) expectedNumberArgs(expected ...uint) error {
-	str := fmt.Sprintf("'%s' has wrong number of args, expected %d", i.Name, expected)
-	i.Err = errors.New(str)
-	return i
-}
-
-func Assemble(lines []string) ([]uint8, error) {
-	out := make([]uint8, 0, len(lines))
-
-	for i, line := range lines {
-		insn := ParseInsn(line, uint(i+1))
-
+	for _, insn := range insns {
 		asm, err := assembleInsn(&insn)
 		if err != nil {
 			return nil, err
 		}
-
 		out = append(out, asm...)
 	}
 
