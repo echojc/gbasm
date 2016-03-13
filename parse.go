@@ -89,7 +89,7 @@ func Parse(lines []string) (*Unit, error) {
 					case "jr":
 						insn.Args[argIndex] = "$66"
 					case "ld":
-						if len(insn.Args) == 2 && (insn.Args[0] == "bc" || insn.Args[0] == "de") {
+						if len(insn.Args) == 2 && isReg16(insn.Args[0]) {
 							insn.Args[argIndex] = "$6666"
 						} else {
 							insn.Args[argIndex] = "($6666)"
@@ -161,12 +161,13 @@ func isSpecialName(name string) bool {
 		"h" == name ||
 		"l" == name ||
 		"a" == name ||
-		"bc" == name ||
-		"de" == name ||
-		"hl" == name ||
-		"sp" == name ||
 		"af" == name ||
 		"nz" == name ||
 		"z" == name ||
-		"nc" == name
+		"nc" == name ||
+		isReg16(name)
+}
+
+func isReg16(name string) bool {
+	return "bc" == name || "de" == name || "hl" == name || "sp" == name
 }
