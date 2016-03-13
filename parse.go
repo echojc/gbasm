@@ -40,8 +40,12 @@ func Parse(lines []string) (*Unit, error) {
 	labelUsages := make(map[string]*LabelLocation)
 
 	for i, text := range lines {
-		text = strings.ToLower(text)
 		lineNumber := uint(i + 1)
+		text = strings.TrimSpace(strings.ToLower(text))
+
+		if text == "" {
+			continue
+		}
 
 		if text[0] == ':' {
 			if currentSection != nil {
