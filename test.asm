@@ -1,18 +1,3 @@
-# gbasm
-
-A compiler to go with [echojc/goboy](https://github.com/echojc/goboy).
-
-## Compiling
-
-No dependencies; just build and run :)
-
-```sh
-go build
-```
-
-## Example
-
-```asm
 :main
   ; set stack pointer
   ld sp, $dfff
@@ -56,4 +41,3 @@ go build
   ld a, $81
   ld ($40), a
   halt
-```

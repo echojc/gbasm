@@ -1,47 +1,50 @@
 package main
 
 import (
-	"fmt"
+	"bufio"
 	"log"
+	"os"
+	"strings"
 )
 
 func main() {
+	log.SetFlags(0)
 
-	//if len(os.Args) < 2 {
-	//	log.Fatalf("Usage: %s <file>\n", os.Args[0])
-	//}
+	if len(os.Args) < 2 {
+		log.Fatalf("Usage: %s <input> [<output>]\n", os.Args[0])
+	}
 
-	//file, err := os.Open(os.Args[1])
-	//if err != nil {
-	//	log.Fatalf("Could not open file '%s'\n", os.Args[1])
-	//}
-	//defer file.Close()
+	inputFilename := os.Args[1]
+	input, err := os.Open(inputFilename)
+	if err != nil {
+		log.Fatalf("Could not open input file '%s'\n", inputFilename)
+	}
+	defer input.Close()
 
-	//scanner := bufio.NewScanner(file)
-	//lines := make([]string, 0)
-	//for scanner.Scan() {
-	//	lines = append(lines, scanner.Text())
-	//}
-	//if err := scanner.Err(); err != nil {
-	//	log.Fatalf("Error reading file: %v\n", err)
-	//}
+	outputFilename := ""
+	if len(os.Args) > 2 {
+		outputFilename = os.Args[2]
+	} else {
+		if i := strings.LastIndex(inputFilename, "."); i >= 0 {
+			outputFilename = inputFilename[0:i] + ".bin"
+		} else {
+			outputFilename = inputFilename + ".bin"
+		}
+	}
 
-	lines := []string{
-		":rst_00",
-		"jp main",
-		":main",
-		"ld a, $03",
-		"di",
-		"ldh ($ff), a",
-		"ld a, $40",
-		"ldh ($41), a",
-		"xor a",
-		"ldh ($40), a",
-		":loop",
-		"ldh a, ($44)",
-		"cp $94",
-		"jr nz, loop",
-		"halt",
+	output, err := os.OpenFile(outputFilename, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0664)
+	if err != nil {
+		log.Fatalf("Could not open output file '%s'\n", outputFilename)
+	}
+	defer output.Close()
+
+	scanner := bufio.NewScanner(input)
+	lines := make([]string, 0)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("Error reading file: %v\n", err)
 	}
 
 	unit, err := Parse(lines)
@@ -54,11 +57,13 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	for i, b := range bytes {
-		fmt.Printf("%02x ", b)
-		if (i+1)%0x10 == 0 {
-			fmt.Println()
-		}
+	count, err := output.Write(bytes)
+	if err != nil {
+		log.Fatalln(err)
 	}
-	fmt.Println()
+
+	if count < 0x8000 {
+		padding := make([]uint8, 0x8000-count)
+		output.Write(padding)
+	}
 }
