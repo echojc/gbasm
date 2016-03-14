@@ -93,13 +93,14 @@ func Compile(unit *Unit) ([]uint8, error) {
 	}
 
 	// resolve labels
-	for targetLabel, labelUsage := range unit.LabelUsages {
+	for _, labelUsage := range unit.LabelUsages {
+		targetLabel := labelUsage.TargetLabel
 		targetAddr := uint16(labelOffsets[targetLabel].Offset)
 
-		usage := labelOffsets[labelUsage.Section]
-		usageOffset := usage.Offset + uint16(usage.InsnOffsets[labelUsage.InsnIndex])
+		usage := labelOffsets[labelUsage.SourceSection]
+		usageOffset := usage.Offset + uint16(usage.InsnOffsets[labelUsage.SourceInsnIndex])
 
-		insn := unit.Sections[labelUsage.Section].Insns[labelUsage.InsnIndex]
+		insn := unit.Sections[labelUsage.SourceSection].Insns[labelUsage.SourceInsnIndex]
 		if insn.Name == "jr" {
 			// calculate relative
 			startAddr := usageOffset + 2
@@ -131,7 +132,23 @@ func Compile(unit *Unit) ([]uint8, error) {
 
 func compileSection(unit *Unit, label string) ([]uint8, []int, error) {
 	if section, found := unit.Sections[label]; found {
-		return Assemble(section.Insns)
+		output := make([]uint8, len(section.Data))
+
+		bytes, offsets, err := Assemble(section.Insns)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// prepend data block if necessary
+		if len(section.Data) > 0 {
+			copy(output, section.Data)
+			for i, offset := range offsets {
+				offsets[i] = offset + len(section.Data)
+			}
+		}
+
+		output = append(output, bytes...)
+		return output, offsets, nil
 	} else {
 		return nil, nil, errors.New(fmt.Sprintf("unknown label '%s'", label))
 	}

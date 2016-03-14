@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 	"unicode"
@@ -11,6 +13,7 @@ import (
 type Section struct {
 	Label      string
 	LineNumber uint
+	Data       []uint8
 	Insns      []Insn
 }
 
@@ -21,23 +24,27 @@ type Insn struct {
 	Err        error
 }
 
-type LabelLocation struct {
-	Section   string
-	InsnIndex int
+type LabelUsage struct {
+	TargetLabel     string
+	SourceSection   string
+	SourceInsnIndex int
 }
 
 type Unit struct {
 	Sections    map[string]*Section
 	Labels      []string
-	LabelUsages map[string]*LabelLocation
+	LabelUsages []*LabelUsage
 }
+
+var labelRegex = regexp.MustCompile("^[a-z_][a-z0-9_]*$")
+var dataLabelReplaceRegex = regexp.MustCompile("[^a-z0-9_]+")
 
 func Parse(lines []string) (*Unit, error) {
 	var currentSection *Section
 
 	sections := make(map[string]*Section)
 	definedLabels := make([]string, 0)
-	labelUsages := make(map[string]*LabelLocation)
+	labelUsages := make([]*LabelUsage, 0)
 
 	for i, text := range lines {
 		lineNumber := uint(i + 1)
@@ -52,24 +59,57 @@ func Parse(lines []string) (*Unit, error) {
 			continue
 		}
 
-		if text[0] == ':' {
-			if currentSection != nil {
-				sections[currentSection.Label] = currentSection
-			}
-
-			label := strings.ToLower(text[1:])
-			if isSpecialName(label) {
-				return nil, errors.New(fmt.Sprintf("'%s' is reserved and can't be used as a label name", label))
-			} else if !isValidLabel(label) {
-				return nil, errors.New(fmt.Sprintf("label '%s' is invalid (alphanumeric + underscore)", label))
-			} else if _, alreadyExists := sections[label]; alreadyExists {
+		if text[0] == '.' { // label
+			label := text[1:]
+			if _, alreadyExists := sections[label]; alreadyExists {
 				return nil, errors.New(fmt.Sprintf("duplicate label '%s' (labels are case insensitive)", label))
 			}
 
-			currentSection = new(Section)
-			currentSection.Label = label
-			currentSection.LineNumber = lineNumber
+			section, err := newSection(label)
+			if err != nil {
+				return nil, err
+			}
+
+			section.LineNumber = lineNumber
 			definedLabels = append(definedLabels, label)
+
+			if currentSection != nil {
+				sections[currentSection.Label] = currentSection
+			}
+			currentSection = section
+
+		} else if text[0] == '<' { // data
+			dataFile, err := os.Open(text[1:])
+			if err != nil {
+				return nil, err
+			}
+			defer dataFile.Close()
+
+			// the '.' is intentional, and becomes a '_' after the regex replace
+			label := "data." + text[1:]
+			label = dataLabelReplaceRegex.ReplaceAllLiteralString(label, "_")
+			if _, alreadyExists := sections[label]; alreadyExists {
+				return nil, errors.New(fmt.Sprintf("duplicate label '%s' (labels are case insensitive)", label))
+			}
+
+			section, err := newSection(label)
+			if err != nil {
+				return nil, err
+			}
+
+			data, err := ioutil.ReadAll(dataFile)
+			if err != nil {
+				return nil, err
+			}
+
+			section.Data = data
+			section.LineNumber = lineNumber
+			definedLabels = append(definedLabels, label)
+
+			if currentSection != nil {
+				sections[currentSection.Label] = currentSection
+			}
+			currentSection = section
 
 		} else if currentSection == nil {
 			return nil, errors.New("all asm must be under some label")
@@ -77,12 +117,13 @@ func Parse(lines []string) (*Unit, error) {
 			insn := ParseInsn(text, lineNumber)
 
 			// replace label usage with placeholder
-			for argIndex, label := range insn.Args {
-				if !isSpecialName(label) && isValidLabel(label) {
-					labelUsages[label] = &LabelLocation{
+			for argIndex, targetLabel := range insn.Args {
+				if !isSpecialName(targetLabel) && isValidLabel(targetLabel) {
+					labelUsages = append(labelUsages, &LabelUsage{
+						targetLabel,
 						currentSection.Label,
 						len(currentSection.Insns),
-					}
+					})
 
 					// replace with appropriate placeholder
 					switch insn.Name {
@@ -114,7 +155,9 @@ func Parse(lines []string) (*Unit, error) {
 
 	// validating labels
 	missingLabels := make([]string, 0)
-	for usedLabel, _ := range labelUsages {
+	for _, labelUsage := range labelUsages {
+		usedLabel := labelUsage.TargetLabel
+
 		if _, found := sections[usedLabel]; !found {
 			missingLabels = append(missingLabels, usedLabel)
 		}
@@ -147,7 +190,17 @@ func (i *Insn) expectedNumberArgs(expected ...uint) error {
 	return i
 }
 
-var labelRegex = regexp.MustCompile("^[a-z_][a-z0-9_]")
+func newSection(label string) (*Section, error) {
+	if isSpecialName(label) {
+		return nil, errors.New(fmt.Sprintf("'%s' is reserved and can't be used as a label name", label))
+	} else if !isValidLabel(label) {
+		return nil, errors.New(fmt.Sprintf("label '%s' is invalid (alphanumeric + underscore)", label))
+	}
+
+	section := new(Section)
+	section.Label = label
+	return section, nil
+}
 
 func isValidLabel(name string) bool {
 	return labelRegex.MatchString(name)
