@@ -62,7 +62,7 @@ func Parse(lines []string) (*Unit, error) {
 		if text[0] == '.' { // label
 			label := text[1:]
 			if _, alreadyExists := sections[label]; alreadyExists {
-				return nil, errors.New(fmt.Sprintf("duplicate label '%s' (labels are case insensitive)", label))
+				return nil, errors.New(fmt.Sprintf("%d: duplicate label '%s' (labels are case insensitive)", i, label))
 			}
 
 			section, err := newSection(label)
@@ -89,7 +89,7 @@ func Parse(lines []string) (*Unit, error) {
 			label := "data." + text[1:]
 			label = dataLabelReplaceRegex.ReplaceAllLiteralString(label, "_")
 			if _, alreadyExists := sections[label]; alreadyExists {
-				return nil, errors.New(fmt.Sprintf("duplicate label '%s' (labels are case insensitive)", label))
+				return nil, errors.New(fmt.Sprintf("%d: duplicate label '%s' (labels are case insensitive)", i, label))
 			}
 
 			section, err := newSection(label)
@@ -112,7 +112,7 @@ func Parse(lines []string) (*Unit, error) {
 			currentSection = section
 
 		} else if currentSection == nil {
-			return nil, errors.New("all asm must be under some label")
+			return nil, errors.New(fmt.Sprintf("%d: all asm must be under some label", i))
 		} else {
 			insn := ParseInsn(text, lineNumber)
 
