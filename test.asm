@@ -1,4 +1,4 @@
-:main
+.main
   ; set stack pointer
   ld sp, $dfff
 
@@ -7,7 +7,7 @@
   ld a, $01
   ldh ($ff), a
 
-:wait_for_vblank
+.wait_for_vblank
   ldh a, ($44)
   cp $94
   jr nz, wait_for_vblank
@@ -26,9 +26,9 @@
   ld a, $00
   ld hl, $9000
   ld de, $9800
-:copy_tiles_outer
+.copy_tiles_outer
   ld b, $10
-:copy_tiles_inner
+.copy_tiles_inner
   ldi (hl), a
   dec b
   jr nz, copy_tiles_inner
@@ -39,5 +39,5 @@
 
   ; enable display
   ld a, $81
-  ld ($40), a
+  ldh ($40), a
   halt
