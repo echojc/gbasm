@@ -54,6 +54,8 @@ func assembleInsn(insn *Insn) ([]uint8, error) {
 				return []uint8{0xea, uint8(addrHi & 0xff), uint8(addrHi >> 8)}, nil
 			case errAddrHi == nil && insn.Args[1] == "sp":
 				return []uint8{0x08, uint8(addrHi & 0xff), uint8(addrHi >> 8)}, nil
+			case insn.Args[0] == "sp" && insn.Args[1] == "hl":
+				return []uint8{0xf9}, nil
 			default:
 				insn.Err = errors.New(fmt.Sprintf("ld has invalid args"))
 				return nil, insn
