@@ -154,8 +154,8 @@ func compileSection(unit *Unit, label string) ([]uint8, []int, error) {
 	}
 }
 
-func compileSpecial(unit *Unit, label string) ([8]uint8, []int, error) {
-	output := [8]uint8{}
+func compileSpecial(unit *Unit, label string) ([]uint8, []int, error) {
+	output := []uint8{}
 	var offsets []int = nil
 
 	if section, found := unit.Sections[label]; found {
@@ -165,9 +165,7 @@ func compileSpecial(unit *Unit, label string) ([8]uint8, []int, error) {
 			return output, nil, err
 		}
 
-		for i := 0; i < 8 && i < len(bytes); i++ {
-			output[i] = bytes[i]
-		}
+		output = bytes
 	}
 
 	return output, offsets, nil
