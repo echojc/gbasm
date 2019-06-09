@@ -26,9 +26,9 @@ func main() {
 		outputFilename = os.Args[2]
 	} else {
 		if i := strings.LastIndex(inputFilename, "."); i >= 0 {
-			outputFilename = inputFilename[0:i] + ".bin"
+			outputFilename = inputFilename[0:i] + ".gb"
 		} else {
-			outputFilename = inputFilename + ".bin"
+			outputFilename = inputFilename + ".gb"
 		}
 	}
 
