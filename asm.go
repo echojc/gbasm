@@ -458,7 +458,7 @@ func assembleInsn(insn *Insn) ([]uint8, error) {
 				insn.Err = errors.New(fmt.Sprintf("rst expects %d only", validAddrs))
 				return nil, insn
 			}
-			return []uint8{0xc7 | (uint8(addr) >> 3)}, nil
+			return []uint8{0xc7 | uint8(addr)}, nil
 		} else {
 			return nil, insn.expectedNumberArgs(1)
 		}
