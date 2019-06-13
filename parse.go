@@ -36,7 +36,7 @@ type Unit struct {
 	LabelUsages []*LabelUsage
 }
 
-var labelRegex = regexp.MustCompile("^[a-z_][a-z0-9_]*$")
+var labelRegex = regexp.MustCompile("^[a-z_!][a-z0-9_!]*$")
 var dataLabelReplaceRegex = regexp.MustCompile("[^a-z0-9_]+")
 
 func Parse(lines []string) (*Unit, error) {
@@ -194,7 +194,7 @@ func newSection(label string) (*Section, error) {
 	if isSpecialName(label) {
 		return nil, errors.New(fmt.Sprintf("'%s' is reserved and can't be used as a label name", label))
 	} else if !isValidLabel(label) {
-		return nil, errors.New(fmt.Sprintf("label '%s' is invalid (alphanumeric + underscore)", label))
+		return nil, errors.New(fmt.Sprintf("label '%s' is invalid (alphanumeric + '_' + '!')", label))
 	}
 
 	section := new(Section)
