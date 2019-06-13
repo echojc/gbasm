@@ -84,9 +84,18 @@ func Compile(unit *Unit) ([]uint8, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// align a section to the closest 0x100 (for lookup tables, etc.)
+		offset := uint16(len(output))
+		if unit.Sections[label].IsAligned && (offset&0x00ff) != 0 {
+			alignedOffset := (offset + 0x100) & 0xff00
+			output = append(output, make([]uint8, alignedOffset-offset)...)
+			offset = alignedOffset
+		}
+
 		labelOffsets[label] = LabelOffset{
 			label,
-			uint16(len(output)),
+			offset,
 			insnOffsets,
 		}
 		output = append(output, bytes...)

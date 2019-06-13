@@ -13,6 +13,7 @@ import (
 type Section struct {
 	Label      string
 	LineNumber uint
+	IsAligned  bool
 	Data       []uint8
 	Insns      []Insn
 }
@@ -60,7 +61,14 @@ func Parse(lines []string) (*Unit, error) {
 		}
 
 		if text[0] == '.' { // label
+
+			isAligned := false
 			label := text[1:]
+			if i := strings.Index(label, ":aligned"); i >= 0 {
+				label = label[:i]
+				isAligned = true
+			}
+
 			if _, alreadyExists := sections[label]; alreadyExists {
 				return nil, errors.New(fmt.Sprintf("%d: duplicate label '%s' (labels are case insensitive)", i, label))
 			}
@@ -71,6 +79,7 @@ func Parse(lines []string) (*Unit, error) {
 			}
 
 			section.LineNumber = lineNumber
+			section.IsAligned = isAligned
 			definedLabels = append(definedLabels, label)
 
 			if currentSection != nil {
@@ -79,14 +88,21 @@ func Parse(lines []string) (*Unit, error) {
 			currentSection = section
 
 		} else if text[0] == '<' { // data
-			dataFile, err := os.Open(text[1:])
+			isAligned := false
+			filename := text[1:]
+			if i := strings.Index(filename, ":aligned"); i >= 0 {
+				filename = filename[:i]
+				isAligned = true
+			}
+
+			dataFile, err := os.Open(filename)
 			if err != nil {
 				return nil, err
 			}
 			defer dataFile.Close()
 
 			// the '.' is intentional, and becomes a '_' after the regex replace
-			label := "data." + text[1:]
+			label := "data." + filename
 			label = dataLabelReplaceRegex.ReplaceAllLiteralString(label, "_")
 			if _, alreadyExists := sections[label]; alreadyExists {
 				return nil, errors.New(fmt.Sprintf("%d: duplicate label '%s' (labels are case insensitive)", i, label))
@@ -104,6 +120,7 @@ func Parse(lines []string) (*Unit, error) {
 
 			section.Data = data
 			section.LineNumber = lineNumber
+			section.IsAligned = isAligned
 			definedLabels = append(definedLabels, label)
 
 			if currentSection != nil {
